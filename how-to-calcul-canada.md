@@ -43,7 +43,9 @@ For Cedar:
 ```bash=
 ssh -X <username>@cedar.computecanada.ca
 ```
+:::info 
 * Use the same password as your Compute Canada account. 
+:::
 * Type `logout` to exit
 #### Windows
 you can use the Ubuntu SubSystem for Windows ([WSL](https://docs.microsoft.com/en-us/windows/wsl/install-win10)) to obtain a console with SSH/SCP capability, or use a native application such as [MobaXTerm](https://mobaxterm.mobatek.net/download.html). In the latter case, choose the SSH connection and fill in the parameters as illustrated below.
@@ -64,9 +66,9 @@ module load python/3.6
 module load scipy-stack
 ```
 This should make available in your environment a standard version of the Python interpreter (3.6) in addition to some very useful packages for scientific computation (e.g. Numpy).
-Next, you need to create a virtual environment that will use the now loaded Python interpreter to perform your learning tasks. To do this : 
+Next, you need to create a virtual environment with [virtualenv](http://pypi.python.org/pypi/virtualenv) that will use the now loaded Python interpreter to perform your learning tasks. To do this : 
 ```bash=
-virtualenv pytorch-env –p python3.6
+virtualenv pytorch-env
 ```
 By default, the environment named `pytorch-env` will be created (if you have not changed your working location) in your "home" folder. This folder does not yet contain the packages that really interest us (e.g. PyTorch), so we have to install them ourselves. To do this, first activate the environment via : 
 ```bash=
@@ -78,6 +80,7 @@ To continue the installation, run the following command:
 pip install numpy torch_gpu torchvision matplotlib opencv_python scikit_learn scikit_image scipy cython --no-index
 ```
 Note that this is a single line that should be copied in its entirety. It will install by PIP all the dependencies necessary for the execution of a learning task in the virtual environment on one of the cluster nodes.
+
 **Optional step**:
 Once a task is submitted to the cluster, it will be executed on a compute node which, unlike the login node used so far, is probably not connected to the Internet. So if you need to start your training from a pre-trained model, you need to make sure that it is already downloaded to your computing environment. Here we provide the necessary command to download a pre-trained ResNet18 model using torchvision : 
 ```python=
@@ -89,7 +92,7 @@ Compute Canada is using [Slurm](https://slurm.schedmd.com/overview.html) for job
 
 ![](https://i.imgur.com/QaGJXx8.png)
 
-Once your environment is in place, you will need to write a script that activates it and executes your learning task. You can write this script on your own machine and then transfer it to the login node, or write it directly to its destination using e.g. Vim.
+Once your environment is in place, you will need to write a script that activates it and executes your learning task. You can write this script on your own machine and then transfer it to the login node, or write it directly to its destination using e.g. [Vim](https://www.vim.org/).
 Here is an example of a script that can be executed on the cluster: 
 ```bash=
 #!/bin/bash
@@ -124,6 +127,39 @@ You can remove a task already started using `qdel`:
 ```bash=
 qdel <JOB_ID>
 ```
+### Quick Test on Cedar
+Once logged on Cedar, create this script:
+```bash=
+#!/bin/bash
+#PBS -N test-cuda
+#PBS -A def-fouchers
+#PBS -l walltime=10
+#PBS -l nodes=1:gpus=1
+#PBS -j oe
+module load python/3.6
+module load scipy-stack
+source ~/pytorch-env/bin/activate
+cd "${PBS_O_WORKDIR}"
+echo "starting..."
+python -c "import torch; print('CUDA AVAILABLE: ' + str(torch.cuda.is_available()))"
+echo "all done"
+```
+The script must be moved to and launched from `/scratch/<username>` or to `/project/def-<your_sponsor>/<username>` where `<username>` is your account name. On Cedar, the job is pushed using `sbatch`:
+```bash=
+sbatch test.sh 
+Submitted batch job 61770526
+```
+and the job queue can be checked with `sq`:
+```bash=
+JOBID     USER      ACCOUNT           NAME  ST  TIME_LEFT NODES CPUS TRES_PER_N MIN_MEM NODELIST (REASON) 
+61770526 fouchers def-fouchers      test-cuda  PD      10:00     1    1      gpu:1    256M  (Priority)
+```
+The output will be in a `slurm-` file in the same directory:
+```bash=
+-rw-r----- 1 fouchers fouchers  39 Feb 12 08:24 slurm-61770526.out
+-rw-r----- 1 fouchers fouchers 325 Feb 12 08:17 test.sh
+```
+Then you can check the content with `cat slurm-61770526.out`
 ## Mapping Distant Folder using sshfs
 `usage: sshfs [user@]host:[dir] mountpoint [options]`
 
