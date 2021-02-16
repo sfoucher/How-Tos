@@ -7,9 +7,9 @@ The goal is to document how to use Calcul Québec infrastructure for deep learni
 **ToDO**:
 
 - [X] Account Creation
-- [ ] Environement Setup
-- [ ] How to interact with the infrastructure
-- [ ] How to push jobs
+- [x] Environement Setup
+- [x] How to interact with the infrastructure
+- [x] How to push jobs
 - [ ] Best practices and receipes
 
 
@@ -81,11 +81,17 @@ pip install numpy torch_gpu torchvision matplotlib opencv_python scikit_learn sc
 ```
 Note that this is a single line that should be copied in its entirety. It will install by PIP all the dependencies necessary for the execution of a learning task in the virtual environment on one of the cluster nodes.
 
+
+
 **Optional step**:
 Once a task is submitted to the cluster, it will be executed on a compute node which, unlike the login node used so far, is probably not connected to the Internet. So if you need to start your training from a pre-trained model, you need to make sure that it is already downloaded to your computing environment. Here we provide the necessary command to download a pre-trained ResNet18 model using torchvision : 
 ```python=
 python -c "import torch; import torchvision; import torch.utils.model_zoo as model_zoo; model_zoo.load_url(torchvision.models.resnet.model_urls['resnet18'])"
 ```
+:::info 
+**Tips and Tricks**
+* `module ava <key1>` gives you a list of all the modules with keyword key1
+:::
 ## Launching a learning task 
 
 Compute Canada is using [Slurm](https://slurm.schedmd.com/overview.html) for job management.
@@ -96,11 +102,14 @@ Once your environment is in place, you will need to write a script that activate
 Here is an example of a script that can be executed on the cluster: 
 ```bash=
 #!/bin/bash
-#PBS -N <JOB_NAME>
-#PBS -A <PROJECT_ID>
-#PBS -l walltime=<MAX_TIME>
-#PBS -l nodes=1:gpus=1
-#PBS -j oe
+#SBATCH --account=def-<my_account> # Your account info (required)
+#SBATCH --job-name=<JOB_NAME>    # Names the job JobName
+#SBATCH -nodes=1	    # Number of nodes to request. (Default=1).
+#SBATCH --ntasks=1 # Number of cores on a single node.
+#SBATCH --time=dd-hh:mm:ss	    # Requests the amount of time needed for the job.
+#SBATCH --mem-per-gpu=8g    # Number of gpus per node. Default is none.
+#SBATCH --gpus-per-node=1
+
 module load python/3.6
 module load scipy-stack
 source ~/pytorch-env/bin/activate
@@ -120,14 +129,19 @@ https://docs.computecanada.ca/wiki/Compute_Canada_Documentation
 
 Finally, to run your script on one of the compute nodes of the cluster, execute the following command: 
 ```bash=
-qsub <SCRIPT_NAME>.sh
+sbatch <SCRIPT_NAME>.sh
 ```
-Note that the scripts provided to `qsub` must contain the `#PBS` parameters mentioned above, and that these cannot be Python scripts directly. If everything works, `qsub`should return a job number, and your training should start soon on one of the cluster nodes.
-You can remove a task already started using `qdel`: 
+Note that the scripts provided to `squeue` must contain the `#PBS` or `#SBATCH` parameters mentioned above, and that these cannot be Python scripts directly. If everything works, `sq` should return a job number, and your training should start soon on one of the cluster nodes.
+You can remove a task already started using `scancel`: 
 ```bash=
-qdel <JOB_ID>
+scancel <JOB_ID>
 ```
+### Using salloc 
+`salloc` is for an interactive task, it is used to allocate resources for a job in real time. Typically this is used to allocate resources and spawn a shell.
+
 ### Quick Test on Cedar
+Cedar is using Slurm, a list of commands can be found [here](https://www.sdsc.edu/~hocks/FG/PBS.slurm.html).
+
 Once logged on Cedar, create this script:
 ```bash=
 #!/bin/bash
@@ -136,6 +150,8 @@ Once logged on Cedar, create this script:
 #PBS -l walltime=10
 #PBS -l nodes=1:gpus=1
 #PBS -j oe
+#SBATCH --mem-per-gpu=8g
+#SBATCH --gpus-per-node=1
 module load python/3.6
 module load scipy-stack
 source ~/pytorch-env/bin/activate
@@ -160,6 +176,17 @@ The output will be in a `slurm-` file in the same directory:
 -rw-r----- 1 fouchers fouchers 325 Feb 12 08:17 test.sh
 ```
 Then you can check the content with `cat slurm-61770526.out`
+
+:::info 
+**Tips and Tricks**
+* If you open your session with `SSH -X` you can use `gedit` to edit files directly
+* Once the output file `slurm-<id>.out` is available, you can monitor the job using `cat slurm-<id>.out`
+* If you are getting an error like `slurmstepd: error: Detected 1 oom-kill event(s) ... Some of your processes may have been killed by the cgroup out-of-memory handler.` then you need to specify a memory size on the gpu with the directive `#SBATCH --mem-per-gpu=8g`
+* Current working directory for `sbatch` is the calling process working directory unless the `--chdir` argument is passed, which will override the current working directory.
+
+:::
+### Example using Pytorch-Lightning
+
 ## Mapping Distant Folder using sshfs
 `usage: sshfs [user@]host:[dir] mountpoint [options]`
 
